@@ -1,4 +1,6 @@
-/target
+**/target
+**/node_modules
+*.swp
 .envrc
 .env
 .idea
