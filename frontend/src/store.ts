@@ -1,19 +1,11 @@
-import { configureStore, createSlice } from '@reduxjs/toolkit';
-
-export type IActivity = { name: string };
-export type IStateActivities = { activities: IActivity[] };
-const initialState: IStateActivities = { activities: [] };
-const activities = createSlice({
-  name: 'activities',
-  initialState,
-  reducers: {},
-});
+import { Action, configureStore, ThunkAction } from '@reduxjs/toolkit';
+import { activities } from './store/activities';
 
 export const store = configureStore({
   reducer: {
     activities: activities.reducer,
   },
 });
-
-export type IRootState = ReturnType<typeof store.getState>;
-// export type AppDispatch = typeof store.dispatch;
+export type RootState = ReturnType<typeof store.getState>;
+export type AppThunk = ThunkAction<void, RootState, unknown, Action<string>>;
+export type AppDispatch = typeof store.dispatch;

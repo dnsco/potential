@@ -1,18 +1,25 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import './App.css';
-import { connect } from 'react-redux';
-import { IActivity, IRootState } from './store';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchActivities } from './store/activities';
+import { RootState } from './store';
 
-type IProps = { activities: IActivity[] };
+function App() {
+  const dispatch = useDispatch();
+  const { activities, status } = useSelector(
+    (state: RootState) => state.activities
+  );
+  useEffect(() => {
+    dispatch(fetchActivities());
+  }, [dispatch]);
 
-function App({ activities }: IProps) {
   return (
     <div className="App">
-      <header className="App-header">{activities.length} activities</header>
+      <header className="App-header">
+        {activities.length} activities – {status}
+      </header>
     </div>
   );
 }
 
-export default connect((state: IRootState) => {
-  return { activities: state.activities.activities };
-})(App);
+export default App;
