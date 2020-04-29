@@ -1,3 +1,4 @@
+use dotenv;
 use std::env;
 
 mod api;
@@ -5,6 +6,8 @@ mod db;
 
 #[async_std::main]
 async fn main() -> Result<(), anyhow::Error> {
+    dotenv::dotenv().ok();
+
     let db_url = env::var("DATABASE_URL")?;
     let db_cons = 10;
     let listen = "0.0.0.0:8080";
