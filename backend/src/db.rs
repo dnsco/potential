@@ -1,3 +1,4 @@
+use crate::api::activities::NewActivity;
 use serde::Serialize;
 use sqlx::postgres::PgPool;
 
@@ -13,11 +14,11 @@ pub async fn fetch_activities(pool: &PgPool) -> sqlx::Result<Vec<Activity>> {
         .await
 }
 
-pub async fn create_activity(pool: &PgPool, name: &str) -> sqlx::Result<Activity> {
+pub async fn create_activity(pool: &PgPool, activity: NewActivity) -> sqlx::Result<Activity> {
     sqlx::query_as!(
         Activity,
         "INSERT INTO activities ( name ) VALUES ( $1 ) RETURNING * ",
-        name
+        activity.name
     )
     .fetch_one(pool)
     .await

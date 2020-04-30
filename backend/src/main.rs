@@ -1,5 +1,7 @@
 use dotenv;
 use std::env;
+use tracing::{Level};
+use tracing_subscriber;
 
 mod api;
 mod db;
@@ -7,6 +9,7 @@ mod db;
 #[async_std::main]
 async fn main() -> Result<(), anyhow::Error> {
     dotenv::dotenv().ok();
+    tracing_subscriber::fmt().with_max_level(Level::TRACE).init();
 
     let db_url = env::var("DATABASE_URL")?;
     let db_cons = 10;
