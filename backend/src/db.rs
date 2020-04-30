@@ -1,6 +1,9 @@
 use crate::api::activities::NewActivity;
 use serde::Serialize;
 use sqlx::postgres::PgPool;
+use secrecy::{SecretString, ExposeSecret};
+
+type DbUrl = SecretString;
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct Activity {
@@ -24,9 +27,10 @@ pub async fn create_activity(pool: &PgPool, activity: NewActivity) -> sqlx::Resu
     .await
 }
 
-pub async fn build_pool(db_url: &String, num_cons: u32) -> sqlx::Result<PgPool> {
+#[tracing::instrument]
+pub async fn build_pool(db_url: DbUrl, num_cons: u32) -> sqlx::Result<PgPool> {
     PgPool::builder()
         .max_size(num_cons) // maximum number of connections in the pool
-        .build(&db_url)
+        .build(db_url.expose_secret())
         .await
 }
