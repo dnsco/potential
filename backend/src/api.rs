@@ -1,14 +1,9 @@
-use crate::db::{create_activity, fetch_activities};
 use http_types::headers::HeaderValue;
-use http_types::StatusCode;
-use serde::Serialize;
-use sqlx::PgPool;
 use tide::security::{CorsMiddleware, Origin};
-use tide::{Request, Response, Server};
 
-type State = PgPool;
+use crate::api::util::ApiState;
 
-pub fn new(pool: PgPool) -> Server<PgPool> {
+pub fn new(pool: sqlx::PgPool) -> tide::Server<ApiState> {
     let cors = CorsMiddleware::new()
         .allow_methods("GET, POST, OPTIONS".parse::<HeaderValue>().unwrap())
         .allow_origin(Origin::from("*"))
@@ -19,19 +14,38 @@ pub fn new(pool: PgPool) -> Server<PgPool> {
     app.at("/")
         .get(|_| async { Ok(String::from("Server is up.")) });
     app.at("/activities")
-        .get(|req: Request<State>| async move {
-            let activities = fetch_activities(req.state()).await?;
-            Ok(to_json_response(activities))
-        })
-        .post(|req: Request<State>| async move {
-            let activity = create_activity(req.state(), "Hai").await?;
-            Ok(to_json_response(&activity))
-        });
+        .get(activities::list)
+        .post(activities::create);
     app
 }
 
-fn to_json_response<T: Serialize + std::fmt::Debug>(entitiy: T) -> Response {
-    Response::new(StatusCode::Ok)
-        .body_json(&entitiy)
-        .expect(&format!("Failed to serialize {:?}", entitiy))
+mod util {
+    use http_types::StatusCode;
+    use serde::Serialize;
+    use sqlx::PgPool;
+
+    pub type ApiState = PgPool;
+    pub type ApiRequest = tide::Request<ApiState>;
+    pub type ApiResult = tide::Result<tide::Response>;
+
+    pub fn to_json_response<T: Serialize + std::fmt::Debug>(entitiy: T) -> ApiResult {
+        tide::Response::new(StatusCode::Ok)
+            .body_json(&entitiy)
+            .map_err(|e| tide::Error::new(StatusCode::InternalServerError, e))
+    }
+}
+
+mod activities {
+    use crate::api::util::{to_json_response, ApiRequest, ApiResult};
+    use crate::db::{create_activity, fetch_activities};
+
+    pub async fn list(req: ApiRequest) -> ApiResult {
+        let activities = fetch_activities(req.state()).await?;
+        to_json_response(activities)
+    }
+
+    pub async fn create(req: ApiRequest) -> ApiResult {
+        let activity = create_activity(req.state(), "Hai").await?;
+        to_json_response(&activity)
+    }
 }
