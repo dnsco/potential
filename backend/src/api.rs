@@ -36,9 +36,10 @@ mod util {
 }
 
 pub mod activities {
+    use serde::Deserialize;
+
     use crate::api::util::{to_json_response, ApiRequest, ApiResult};
     use crate::db::{create_activity, fetch_activities};
-    use serde::Deserialize;
 
     pub async fn list(req: ApiRequest) -> ApiResult {
         let activities = fetch_activities(req.state()).await?;
