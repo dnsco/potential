@@ -1,8 +1,9 @@
-use crate::db::build_pool;
 use duct::cmd;
 use secrecy::SecretString;
 use sqlx::PgPool;
 use std::env;
+
+use crate::db::build_pool;
 
 //todo: make this operate over multiple test dbs so cargo test passes instead of individual files
 pub async fn reset_db() -> anyhow::Result<PgPool> {
