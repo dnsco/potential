@@ -1,16 +1,16 @@
 use csv::Trim;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use sqlx::PgPool;
 use std::io;
 
 use crate::db::find_or_create_activity;
-use chrono::{DateTime, Utc};
+use chrono::NaiveDate;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 struct Record {
-    #[serde(with = "maybe_date")]
-    date: Option<DateTime<Utc>>,
+    #[serde(deserialize_with = "deserialize_date")]
+    date: Option<NaiveDate>,
     exercise: String,
     reps: String,
     sets: String,
@@ -33,7 +33,6 @@ impl<T: io::Read> Import<T> {
     pub fn rows(mut self) -> Vec<Record> {
         self.reader
             .deserialize::<Record>()
-            .into_iter()
             .filter_map(Result::ok)
             .filter(|r| Option::is_some(&r.date))
             .collect()
@@ -49,31 +48,17 @@ pub async fn import(pool: &PgPool, spreadsheet: String) -> anyhow::Result<()> {
     Ok(())
 }
 
-mod maybe_date {
-    use chrono::{DateTime, TimeZone, Utc};
-    use serde::{self, Deserialize, Deserializer};
+const DATE_FORMAT: &str = "%Y-%m-%d";
 
-    const FORMAT: &str = "%Y-%m-%d %H:%M:%S";
-    const TWO_OCLOCK_PM: &str = " 14:00:00";
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<DateTime<Utc>>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let mut s = String::deserialize(deserializer)?;
-        let val = if s.is_empty() {
-            None
-        } else {
-            s.push_str(TWO_OCLOCK_PM);
-
-            Some(
-                Utc.datetime_from_str(&s, FORMAT)
-                    .map_err(serde::de::Error::custom)?,
-            )
-        };
-
-        Ok(val)
-    }
+pub fn deserialize_date<'de, D>(deserializer: D) -> Result<Option<NaiveDate>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Option::deserialize(deserializer)?
+        .map(|s: String| {
+            NaiveDate::parse_from_str(&s, DATE_FORMAT).map_err(serde::de::Error::custom)
+        })
+        .transpose()
 }
 
 #[cfg(test)]
