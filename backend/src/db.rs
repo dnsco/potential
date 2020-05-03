@@ -1,7 +1,7 @@
 use crate::api::activities::NewActivity;
+use secrecy::{ExposeSecret, SecretString};
 use serde::Serialize;
 use sqlx::postgres::PgPool;
-use secrecy::{SecretString, ExposeSecret};
 
 type DbUrl = SecretString;
 
@@ -9,6 +9,7 @@ type DbUrl = SecretString;
 pub struct Activity {
     name: String,
     id: i32,
+    parent_id: i32,
 }
 
 pub async fn fetch_activities(pool: &PgPool) -> sqlx::Result<Vec<Activity>> {

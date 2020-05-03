@@ -19,7 +19,8 @@ SET default_with_oids = false;
 
 CREATE TABLE public.activities (
     id integer NOT NULL,
-    name character varying(255) NOT NULL
+    name character varying(255) NOT NULL,
+    parent_id integer NOT NULL
 );
 
 
@@ -51,7 +52,8 @@ CREATE TABLE public.activity_events (
     id integer NOT NULL,
     name character varying(255) NOT NULL,
     notes text,
-    activity_id integer NOT NULL
+    activity_id integer NOT NULL,
+    parent_id integer NOT NULL
 );
 
 
@@ -123,11 +125,27 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
+-- Name: activities activities_parent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.activities
+    ADD CONSTRAINT activities_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.activities(id);
+
+
+--
 -- Name: activity_events activity_events_activity_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.activity_events
     ADD CONSTRAINT activity_events_activity_id_fkey FOREIGN KEY (activity_id) REFERENCES public.activities(id);
+
+
+--
+-- Name: activity_events activity_events_parent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.activity_events
+    ADD CONSTRAINT activity_events_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.activity_events(id);
 
 
 --
