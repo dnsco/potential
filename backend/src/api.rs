@@ -36,19 +36,12 @@ mod util {
 }
 
 pub mod activities {
-    use serde::Deserialize;
-
     use crate::api::util::{to_json_response, ApiRequest, ApiResult};
-    use crate::db::{create_activity, fetch_activities};
+    use crate::db::{create_activity, fetch_activities, NewActivity};
 
     pub async fn list(req: ApiRequest) -> ApiResult {
         let activities = fetch_activities(req.state()).await?;
         to_json_response(activities)
-    }
-
-    #[derive(Deserialize)]
-    pub struct NewActivity {
-        pub name: String,
     }
 
     pub async fn create(mut req: ApiRequest) -> ApiResult {

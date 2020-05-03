@@ -20,7 +20,7 @@ SET default_with_oids = false;
 CREATE TABLE public.activities (
     id integer NOT NULL,
     name character varying(255) NOT NULL,
-    parent_id integer NOT NULL
+    parent_id integer
 );
 
 
@@ -53,7 +53,7 @@ CREATE TABLE public.activity_events (
     name character varying(255) NOT NULL,
     notes text,
     activity_id integer NOT NULL,
-    parent_id integer NOT NULL
+    parent_id integer
 );
 
 
