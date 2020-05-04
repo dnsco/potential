@@ -39,8 +39,8 @@ pub mod activities {
     use std::env;
 
     use crate::api::util::{to_json_response, ApiRequest, ApiResult};
-    use crate::api::AsStdError;
     use crate::db::{DbImport, NewActivity, Repo};
+    use http_types::StatusCode;
 
     pub async fn import(req: ApiRequest) -> ApiResult {
         let repo = Repo { pool: req.state() };
@@ -49,7 +49,7 @@ pub mod activities {
         DbImport::from(&repo, strength_url)?
             .run()
             .await
-            .map_err(AsStdError)?;
+            .map_err(|e| tide::Error::from_str(StatusCode::InternalServerError, e))?;
 
         to_json_response(())
     }
@@ -67,7 +67,3 @@ pub mod activities {
         to_json_response(&activity)
     }
 }
-
-#[derive(thiserror::Error, Debug)]
-#[error(transparent)]
-pub struct AsStdError(#[from] anyhow::Error);
