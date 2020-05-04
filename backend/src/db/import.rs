@@ -1,10 +1,11 @@
+use chrono::NaiveDate;
 use csv::Trim;
 use serde::{Deserialize, Deserializer};
 use sqlx::PgPool;
+use std::collections::HashMap;
 use std::io;
 
 use crate::db::find_or_create_activity;
-use chrono::NaiveDate;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -36,6 +37,21 @@ impl<T: io::Read> Import<T> {
             .filter_map(Result::ok)
             .filter(|r| Option::is_some(&r.date))
             .collect()
+    }
+
+    #[allow(dead_code)]
+    pub fn days(self) -> HashMap<NaiveDate, Vec<Record>> {
+        let mut days: HashMap<NaiveDate, Vec<Record>> = HashMap::new();
+        for row in self.rows() {
+            let date = row.date.as_ref().unwrap();
+            match days.get_mut(date) {
+                Some(records) => records.push(row),
+                None => {
+                    days.insert(date.clone(), vec![row]);
+                }
+            };
+        }
+        days
     }
 }
 
@@ -70,6 +86,28 @@ mod tests {
 
     use crate::db::fetch_activities;
     use crate::test_util::reset_db;
+    use tap::TapOps;
+
+    const TEST_SHEET: &str = "Date	Exercise	Reps	Sets\n\
+    2020-04-01	Bicep Curl	6	25, 30, 35, 37.5 (cheat at 5)
+    2020-04-02	Meow	7	30, 40, 45👍, 22 (woot)
+    2020-04-01	Miliatary Press	7	30, 35, 37.5, 40, 45👍
+    ";
+
+    #[test]
+    fn test_record() -> anyhow::Result<()> {
+        let import = Import::from(TEST_SHEET.as_bytes());
+        let days = import.days();
+        assert_eq!(2, days.len());
+        let keys = days.keys().collect::<Vec<&NaiveDate>>().tap(|y| y.sort());
+        let apr_1 = days.get(keys.first().unwrap()).unwrap();
+        let apr_2 = days.get(keys.last().unwrap()).unwrap();
+
+        assert_eq!(2, apr_1.len());
+        assert_eq!(1, apr_2.len());
+
+        Ok(())
+    }
 
     #[async_std::test]
     async fn test_import() -> anyhow::Result<()> {
