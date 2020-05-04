@@ -1285,6 +1285,7 @@ dependencies = [
  "sqlx",
  "surf",
  "tap",
+ "thiserror",
  "tide",
  "tracing",
  "tracing-futures",

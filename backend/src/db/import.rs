@@ -1,11 +1,13 @@
 use chrono::NaiveDate;
 use csv::Trim;
 use serde::{Deserialize, Deserializer};
-use sqlx::PgPool;
+
 use std::collections::HashMap;
 use std::io;
 
-use crate::db::find_or_create_activity;
+use crate::db::Repo;
+use duct::cmd;
+use serde::de::Error as DeserError;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -17,11 +19,13 @@ struct Record {
     sets: String,
 }
 
-struct Import<T> {
+struct ParsedCsv<T> {
     reader: csv::Reader<T>,
 }
 
-impl<T: io::Read> Import<T> {
+type ParsedDays = HashMap<NaiveDate, Vec<Record>>;
+
+impl<T: io::Read> ParsedCsv<T> {
     fn from(spreadsheet: T) -> Self {
         Self {
             reader: csv::ReaderBuilder::new()
@@ -39,8 +43,7 @@ impl<T: io::Read> Import<T> {
             .collect()
     }
 
-    #[allow(dead_code)]
-    pub fn days(self) -> HashMap<NaiveDate, Vec<Record>> {
+    pub fn days(self) -> ParsedDays {
         let mut days: HashMap<NaiveDate, Vec<Record>> = HashMap::new();
         for row in self.rows() {
             let date = row.date.as_ref().unwrap();
@@ -55,13 +58,45 @@ impl<T: io::Read> Import<T> {
     }
 }
 
-#[allow(dead_code)]
-pub async fn import(pool: &PgPool, spreadsheet: String) -> anyhow::Result<()> {
-    for row in Import::from(spreadsheet.as_bytes()).rows() {
-        find_or_create_activity(&pool, &row.exercise).await?;
+pub struct DbImport<'a> {
+    repo: &'a Repo<'a>,
+    days: ParsedDays,
+}
+
+impl<'a> DbImport<'a> {
+    pub fn from(repo: &'a Repo<'a>, strength_url: String) -> Result<Self, io::Error> {
+        // #todo: why does surf 502 but shelling out to curl work?
+        // let spreadsheet = get_url(strength_url).await?;
+        let spreadsheet = cmd!("curl", strength_url).read()?;
+
+        Ok(DbImport {
+            repo: &repo,
+            days: ParsedCsv::from(spreadsheet.as_bytes()).days(),
+        })
     }
 
-    Ok(())
+    pub async fn run(self) -> anyhow::Result<()> {
+        let workout_activity = self.repo.find_or_create_activity("Workout", None).await?;
+
+        for (date, records) in self.days {
+            let workout = self
+                .repo
+                .create_activity_event(&workout_activity, &format!("Workout {}", date), None)
+                .await?;
+            for record in records {
+                let exercise = self
+                    .repo
+                    .find_or_create_activity(&record.exercise, Some(&workout_activity))
+                    .await?;
+
+                self.repo
+                    .create_activity_event(&exercise, &record.sets, Some(&workout))
+                    .await?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 const DATE_FORMAT: &str = "%Y-%m-%d";
@@ -71,9 +106,7 @@ where
     D: Deserializer<'de>,
 {
     Option::deserialize(deserializer)?
-        .map(|s: String| {
-            NaiveDate::parse_from_str(&s, DATE_FORMAT).map_err(serde::de::Error::custom)
-        })
+        .map(|s: String| NaiveDate::parse_from_str(&s, DATE_FORMAT).map_err(DeserError::custom))
         .transpose()
 }
 
@@ -81,11 +114,8 @@ where
 mod tests {
     use super::*;
 
-    use duct::cmd;
-    use std::env;
-
-    use crate::db::fetch_activities;
     use crate::test_util::reset_db;
+    use std::env;
     use tap::TapOps;
 
     const TEST_SHEET: &str = "Date	Exercise	Reps	Sets\n\
@@ -96,7 +126,7 @@ mod tests {
 
     #[test]
     fn test_record() -> anyhow::Result<()> {
-        let import = Import::from(TEST_SHEET.as_bytes());
+        let import = ParsedCsv::from(TEST_SHEET.as_bytes());
         let days = import.days();
         assert_eq!(2, days.len());
         let keys = days.keys().collect::<Vec<&NaiveDate>>().tap(|y| y.sort());
@@ -113,18 +143,20 @@ mod tests {
     async fn test_import() -> anyhow::Result<()> {
         dotenv::dotenv()?;
         let strength_url = env::var("STRENGTH_URL")?;
-        let pool = reset_db().await?;
+        let repo = Repo {
+            pool: &reset_db().await?,
+        };
 
-        // #todo: why does surf 502 but shelling out to curl work?
-        // let spreadsheet = get_url(strength_url).await?;
-        let spreadsheet = cmd!("curl", strength_url).read()?;
-        import(&pool, spreadsheet).await?;
-        let mut names: Vec<String> = fetch_activities(&pool)
+        DbImport::from(&repo, strength_url)?.run().await?;
+
+        let names = repo
+            .fetch_activities()
             .await?
             .into_iter()
             .map(|a| a.name)
-            .collect();
-        names.sort();
+            .collect::<Vec<String>>()
+            .tap(|n| n.sort());
+
         dbg!(names);
         Ok(())
     }

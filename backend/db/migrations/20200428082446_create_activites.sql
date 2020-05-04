@@ -6,10 +6,11 @@ CREATE TABLE activities
     parent_id INT REFERENCES activities (id)
 );
 
+CREATE UNIQUE INDEX IXU_activities_name ON activities (parent_id, name);
+
 CREATE TABLE activity_events
 (
     id          SERIAL PRIMARY KEY,
-    name        VARCHAR(255)                   NOT NULL,
     notes       TEXT,
     activity_id INT REFERENCES activities (id) NOT NULL,
     parent_id   INT REFERENCES activity_events (id)

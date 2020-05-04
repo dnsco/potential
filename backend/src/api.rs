@@ -13,9 +13,9 @@ pub fn new(pool: sqlx::PgPool) -> tide::Server<ApiState> {
     app.middleware(cors);
     app.at("/")
         .get(|_| async { Ok(String::from("Server is up.")) });
-    app.at("/activities")
-        .get(activities::list)
-        .post(activities::create);
+    let mut acts = app.at("/activities");
+    acts.get(activities::list).post(activities::create);
+    acts.at("/import").get(activities::import);
     app
 }
 
@@ -36,17 +36,38 @@ mod util {
 }
 
 pub mod activities {
+    use std::env;
+
     use crate::api::util::{to_json_response, ApiRequest, ApiResult};
-    use crate::db::{create_activity, fetch_activities, NewActivity};
+    use crate::api::AsStdError;
+    use crate::db::{DbImport, NewActivity, Repo};
+
+    pub async fn import(req: ApiRequest) -> ApiResult {
+        let repo = Repo { pool: req.state() };
+        let strength_url = env::var("STRENGTH_URL")?;
+
+        DbImport::from(&repo, strength_url)?
+            .run()
+            .await
+            .map_err(AsStdError)?;
+
+        to_json_response(())
+    }
 
     pub async fn list(req: ApiRequest) -> ApiResult {
-        let activities = fetch_activities(req.state()).await?;
+        let repo = Repo { pool: req.state() };
+        let activities = repo.fetch_activities().await?;
         to_json_response(activities)
     }
 
     pub async fn create(mut req: ApiRequest) -> ApiResult {
         let new: NewActivity = req.body_json().await?;
-        let activity = create_activity(req.state(), new).await?;
+        let repo = Repo { pool: req.state() };
+        let activity = repo.create_activity(new, None).await?;
         to_json_response(&activity)
     }
 }
+
+#[derive(thiserror::Error, Debug)]
+#[error(transparent)]
+pub struct AsStdError(#[from] anyhow::Error);

@@ -50,7 +50,6 @@ ALTER SEQUENCE public.activities_id_seq OWNED BY public.activities.id;
 
 CREATE TABLE public.activity_events (
     id integer NOT NULL,
-    name character varying(255) NOT NULL,
     notes text,
     activity_id integer NOT NULL,
     parent_id integer
@@ -122,6 +121,13 @@ ALTER TABLE ONLY public.activity_events
 
 ALTER TABLE ONLY public.schema_migrations
     ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
+
+
+--
+-- Name: ixu_activities_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ixu_activities_name ON public.activities USING btree (parent_id, name);
 
 
 --
