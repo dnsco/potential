@@ -86,6 +86,12 @@ impl<'a> Repo<'a> {
             .fetch_all(self.pool)
             .await
     }
+
+    pub async fn fetch_activity_events(&self) -> sqlx::Result<Vec<ActivityEvent>> {
+        sqlx::query_as!(ActivityEvent, "select * from activity_events")
+            .fetch_all(self.pool)
+            .await
+    }
 }
 
 #[derive(Deserialize)]

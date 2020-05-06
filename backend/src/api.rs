@@ -13,9 +13,12 @@ pub fn new(pool: sqlx::PgPool) -> tide::Server<ApiState> {
     app.middleware(cors);
     app.at("/")
         .get(|_| async { Ok(String::from("Server is up.")) });
-    let mut acts = app.at("/activities");
-    acts.get(activities::list).post(activities::create);
-    acts.at("/import").get(activities::import);
+
+    let mut activities = app.at("/activities/?");
+    activities.get(activities::list).post(activities::create);
+    activities.at("/import").get(activities::import);
+    app.at("/activity_events").get(activity_events::list);
+
     app
 }
 
@@ -65,5 +68,16 @@ pub mod activities {
         let repo = Repo { pool: req.state() };
         let activity = repo.create_activity(new, None).await?;
         to_json_response(&activity)
+    }
+}
+
+pub mod activity_events {
+    use crate::api::util::{to_json_response, ApiRequest, ApiResult};
+    use crate::db::Repo;
+
+    pub async fn list(req: ApiRequest) -> ApiResult {
+        let repo = Repo { pool: req.state() };
+        let activities = repo.fetch_activity_events().await?;
+        to_json_response(activities)
     }
 }
