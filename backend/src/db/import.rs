@@ -5,7 +5,7 @@ use serde::{Deserialize, Deserializer};
 use std::collections::HashMap;
 use std::io;
 
-use crate::db::Repo;
+use crate::db::{ActivitiesRepo, ActivityEventsRepo, RepoFactory};
 use duct::cmd;
 use serde::de::Error as DeserError;
 
@@ -59,38 +59,41 @@ impl<T: io::Read> ParsedCsv<T> {
 }
 
 pub struct DbImport<'a> {
-    repo: &'a Repo<'a>,
     days: ParsedDays,
+    activities: ActivitiesRepo<'a>,
+    activity_events: ActivityEventsRepo<'a>,
 }
 
 impl<'a> DbImport<'a> {
-    pub fn from(repo: &'a Repo<'a>, strength_url: String) -> Result<Self, io::Error> {
+    pub fn from<T: RepoFactory>(repo: &'a T, strength_url: String) -> Result<Self, io::Error> {
         // #todo: why does surf 502 but shelling out to curl work?
         // let spreadsheet = get_url(strength_url).await?;
         let spreadsheet = cmd!("curl", strength_url).read()?;
 
         Ok(DbImport {
-            repo: &repo,
             days: ParsedCsv::from(spreadsheet.as_bytes()).days(),
+            activities: repo.activities(),
+            activity_events: repo.activity_events(),
         })
     }
 
     pub async fn run(self) -> anyhow::Result<()> {
-        let workout_activity = self.repo.find_or_create_activity("Workout", None).await?;
+        let workout_activity = self.activities.find_or_create("Workout", None).await?;
 
         for (date, records) in self.days {
             let workout = self
-                .repo
-                .create_activity_event(&workout_activity, &format!("Workout {}", date), None)
+                .activity_events
+                .create(&workout_activity, &format!("Workout {}", date), None)
                 .await?;
+
             for record in records {
                 let exercise = self
-                    .repo
-                    .find_or_create_activity(&record.exercise, Some(&workout_activity))
+                    .activities
+                    .find_or_create(&record.exercise, Some(&workout_activity))
                     .await?;
 
-                self.repo
-                    .create_activity_event(&exercise, &record.sets, Some(&workout))
+                self.activity_events
+                    .create(&exercise, &record.sets, Some(&workout))
                     .await?;
             }
         }
@@ -143,14 +146,13 @@ mod tests {
     async fn test_import() -> anyhow::Result<()> {
         dotenv::dotenv()?;
         let strength_url = env::var("STRENGTH_URL")?;
-        let repo = Repo {
-            pool: &reset_db().await?,
-        };
+        let pool = &reset_db().await?;
 
-        DbImport::from(&repo, strength_url)?.run().await?;
+        DbImport::from(pool, strength_url)?.run().await?;
 
-        let names = repo
-            .fetch_activities()
+        let names = pool
+            .activities()
+            .fetch()
             .await?
             .into_iter()
             .map(|a| a.name)

@@ -2,8 +2,8 @@ use secrecy::SecretString;
 use std::env;
 use tracing_subscriber::EnvFilter;
 
-mod api;
 mod db;
+mod web;
 
 #[async_std::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -18,7 +18,7 @@ async fn main() -> Result<(), anyhow::Error> {
         .init();
 
     let pool = db::build_pool(db_url, db_cons).await?;
-    api::new(pool).listen(listen).await?;
+    web::new(pool).listen(listen).await?;
     Ok(())
 }
 
