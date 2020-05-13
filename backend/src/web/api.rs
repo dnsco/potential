@@ -16,7 +16,9 @@ pub mod activities {
     use crate::web::api::{to_json_response, ApiRequest, ApiResult};
 
     pub async fn list(req: ApiRequest<impl RepoFactory>) -> ApiResult {
-        let activities = req.state().activities().fetch().await?;
+        let pool = req.state();
+        let user = pool.users().find(1).await?;
+        let activities = pool.activities().fetch_for(&user).await?;
         to_json_response(activities)
     }
 

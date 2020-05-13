@@ -1,12 +1,19 @@
 -- migrate:up
+CREATE TABLE users
+(
+    id SERIAL PRIMARY KEY
+);
+
 CREATE TABLE activities
 (
     id        SERIAL PRIMARY KEY,
-    name      VARCHAR(255) NOT NULL,
+    name      VARCHAR(255)              NOT NULL,
+    user_id   INT REFERENCES users (id) NOT NULL,
     parent_id INT REFERENCES activities (id)
+
 );
 
-CREATE UNIQUE INDEX IXU_activities_name ON activities (parent_id, name);
+CREATE UNIQUE INDEX IXU_activities_name ON activities (user_id, name);
 
 CREATE TABLE activity_events
 (
@@ -17,4 +24,6 @@ CREATE TABLE activity_events
 );
 
 -- migrate:down
+DROP TABLE users CASCADE;
 DROP TABLE activities CASCADE;
+DROP TABLE activity_events;

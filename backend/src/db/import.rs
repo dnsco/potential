@@ -5,6 +5,7 @@ use serde::{Deserialize, Deserializer};
 use std::collections::HashMap;
 use std::io;
 
+use crate::db::users::User;
 use crate::db::{ActivitiesRepo, ActivityEventsRepo, RepoFactory};
 use duct::cmd;
 use serde::de::Error as DeserError;
@@ -77,8 +78,11 @@ impl<'a> DbImport<'a> {
         })
     }
 
-    pub async fn run(self) -> anyhow::Result<()> {
-        let workout_activity = self.activities.find_or_create("Workout", None).await?;
+    pub async fn run(self, user: &User) -> anyhow::Result<()> {
+        let workout_activity = self
+            .activities
+            .find_or_create("Workout", None, user)
+            .await?;
 
         for (date, records) in self.days {
             let workout = self
@@ -89,7 +93,7 @@ impl<'a> DbImport<'a> {
             for record in records {
                 let exercise = self
                     .activities
-                    .find_or_create(&record.exercise, Some(&workout_activity))
+                    .find_or_create(&record.exercise, Some(&workout_activity), user)
                     .await?;
 
                 self.activity_events
@@ -117,7 +121,7 @@ where
 mod tests {
     use super::*;
 
-    use crate::test_util::reset_db;
+    use crate::test_util::test_db;
     use std::env;
     use tap::TapOps;
 
@@ -146,13 +150,14 @@ mod tests {
     async fn test_import() -> anyhow::Result<()> {
         dotenv::dotenv()?;
         let strength_url = env::var("STRENGTH_URL")?;
-        let pool = &reset_db().await?;
+        let pool = &test_db().await?;
 
-        DbImport::from(pool, strength_url)?.run().await?;
+        let user = pool.users().create().await?;
+        DbImport::from(pool, strength_url)?.run(&user).await?;
 
         let names = pool
             .activities()
-            .fetch()
+            .fetch_for(&user)
             .await?
             .into_iter()
             .map(|a| a.name)

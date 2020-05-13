@@ -29,9 +29,11 @@ pub fn new<T: RepoFactory + Send + Sync + 'static>(pool: T) -> tide::Server<T> {
 
 pub async fn import(req: tide::Request<impl RepoFactory>) -> tide::Result<String> {
     let strength_url = env::var("STRENGTH_URL")?;
+    let pool = req.state();
+    let user = pool.users().create().await?;
 
-    DbImport::from(req.state(), strength_url)?
-        .run()
+    DbImport::from(pool, strength_url)?
+        .run(&user)
         .await
         .map_err(|e| tide::Error::from_str(StatusCode::InternalServerError, e))?;
 

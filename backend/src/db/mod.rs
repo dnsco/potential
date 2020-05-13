@@ -1,17 +1,21 @@
 use secrecy::{ExposeSecret, SecretString};
 use sqlx::postgres::PgPool;
 
+use crate::db::users::UsersRepo;
 pub use activities::{ActivitiesRepo, Activity, NewActivity};
 pub use activity_events::ActivityEventsRepo;
 pub use import::DbImport;
 
 mod activities;
 mod activity_events;
+mod users;
+
 mod import;
 
 pub trait RepoFactory {
     fn activities(&self) -> ActivitiesRepo;
     fn activity_events(&self) -> ActivityEventsRepo;
+    fn users(&self) -> UsersRepo;
 }
 
 impl RepoFactory for PgPool {
@@ -21,6 +25,10 @@ impl RepoFactory for PgPool {
 
     fn activity_events(&self) -> ActivityEventsRepo {
         ActivityEventsRepo { pool: self }
+    }
+
+    fn users(&self) -> UsersRepo {
+        UsersRepo { pool: self }
     }
 }
 
