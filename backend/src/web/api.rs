@@ -1,14 +1,11 @@
-use http_types::StatusCode;
 use serde::Serialize;
 
 pub type ApiRequest<T> = tide::Request<T>;
 //todo: stop erasing return type of functions so that we can return something meaningful (like Vec<Activity>)
-pub type ApiResult = tide::Result<tide::Response>;
+pub type ApiResult = tide::Result<tide::Body>;
 
 pub fn to_json_response<T: Serialize + std::fmt::Debug>(entitiy: T) -> ApiResult {
-    tide::Response::new(StatusCode::Ok)
-        .body_json(&entitiy)
-        .map_err(|e| tide::Error::new(StatusCode::InternalServerError, e))
+    tide::Body::from_json(&entitiy)
 }
 
 pub mod activities {

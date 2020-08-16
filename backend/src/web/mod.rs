@@ -15,7 +15,7 @@ pub fn new(pool: PgPool) -> tide::Server<PgPool> {
         .allow_credentials(false);
 
     let mut app = tide::with_state(pool);
-    app.middleware(cors);
+    app.with(cors);
 
     app.at("/")
         .get(|_| async { Ok(String::from("Server is up.")) });
